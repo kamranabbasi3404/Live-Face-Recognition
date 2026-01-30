@@ -1004,10 +1004,18 @@ class FaceVerificationApp(ctk.CTk):
                                     result_text = f"✅ VERIFIED: {result['user_name']} ({result['confidence']:.1f}%)"
                                     text_color = "green"
                                     
-                                    # Show popup once per session
-                                    if not getattr(self, '_popup_shown', False):
+                                    # Show popup once when fully verified (voting complete)
+                                    voting_status = result.get('voting_status', '')
+                                    if voting_status == 'complete' and not getattr(self, '_popup_shown', False):
                                         self._popup_shown = True
-                                        self.after(0, lambda r=result: self._show_verification_popup(r))
+                                        # Stop camera and show popup
+                                        self.camera_running = False
+                                        user_name = result.get('user_name', 'Unknown')
+                                        confidence = result.get('confidence', 0)
+                                        self.after(100, lambda: messagebox.showinfo(
+                                            "✅ ACCESS GRANTED",
+                                            f"Welcome back, {user_name}!\n\nConfidence: {confidence:.1f}%"
+                                        ))
                                 else:
                                     last_color = (0, 0, 255)
                                     result_text = f"❌ NOT VERIFIED ({result['confidence']:.1f}%)"
@@ -1149,21 +1157,22 @@ class FaceVerificationApp(ctk.CTk):
     
     def _show_verification_popup(self, result):
         """Show professional verification popup"""
-        try:
-            # If verified, stop camera when popup closes
-            callback = None
-            if result['verified']:
-                callback = self._stop_verification
+        print(f"=== POPUP TRIGGERED === Result: {result}")  # Debug
+        
+        # Stop camera FIRST if verified
+        if result['verified']:
+            print("Stopping camera...")
+            self._stop_verification()
             
-            popup = VerificationPopup(
-                self,
-                verified=result['verified'],
-                user_name=result.get('user_name', 'Unknown'),
-                confidence=result.get('confidence', 0),
-                on_close=callback
+            # Show simple message first
+            user_name = result.get('user_name', 'Unknown')
+            confidence = result.get('confidence', 0)
+            
+            # Use simple messagebox as backup (guaranteed to work)
+            messagebox.showinfo(
+                "✅ ACCESS GRANTED",
+                f"Welcome back, {user_name}!\n\nConfidence: {confidence:.1f}%"
             )
-        except Exception as e:
-            print(f"Popup error: {e}")
     
     # === User Management Methods ===
     
