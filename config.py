@@ -17,8 +17,8 @@ FACE_DETECTOR_BACKEND = "opencv"  # Options: opencv, mtcnn, retinaface, ssd
 MIN_FACE_SIZE = 50  # Minimum face size in pixels (lowered for low-res cameras)
 FACE_DETECTION_CONFIDENCE = 0.4
 
-# Embedding settings
-EMBEDDING_MODEL = "VGG-Face"  # Options: VGG-Face, Facenet, Facenet512, OpenFace, DeepFace
+# Embedding settings - Using Facenet for FASTER performance
+EMBEDDING_MODEL = "Facenet"  # Facenet is 3-5x faster than VGG-Face
 DISTANCE_METRIC = "cosine"  # Options: cosine, euclidean, euclidean_l2
 
 # Verification settings

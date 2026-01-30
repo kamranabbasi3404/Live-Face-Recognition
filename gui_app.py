@@ -33,24 +33,27 @@ ctk.set_default_color_theme("blue")
 class VerificationPopup(ctk.CTkToplevel):
     """Professional verification result popup"""
     
-    def __init__(self, parent, verified, user_name=None, confidence=0, photo=None):
+    def __init__(self, parent, verified, user_name=None, confidence=0, on_close=None):
         super().__init__(parent)
         
-        # Window setup
-        self.title("")
-        self.geometry("400x350")
-        self.resizable(False, False)
-        self.transient(parent)
-        self.grab_set()
+        self.on_close_callback = on_close
         
-        # Center on parent
+        # Window setup - BIGGER SIZE
+        self.title("")
+        self.geometry("420x450")
+        self.resizable(False, False)
+        
+        # Center on screen (not parent to avoid blocking)
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() - 400) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - 350) // 2
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        x = (screen_w - 420) // 2
+        y = (screen_h - 450) // 2
         self.geometry(f"+{x}+{y}")
         
-        # Remove title bar on Windows
+        # Remove title bar and make topmost
         self.overrideredirect(True)
+        self.attributes("-topmost", True)
         
         # Main frame with rounded corners effect
         if verified:
@@ -71,43 +74,44 @@ class VerificationPopup(ctk.CTkToplevel):
         
         # Close button
         close_btn = ctk.CTkButton(
-            main_frame, text="✕", width=30, height=30,
+            main_frame, text="✕", width=35, height=35,
             fg_color="transparent", hover_color=accent_color,
-            command=self.destroy
+            font=ctk.CTkFont(size=18),
+            command=self._close
         )
         close_btn.place(relx=0.95, rely=0.02, anchor="ne")
         
         # Icon
         ctk.CTkLabel(
             main_frame, text=icon,
-            font=ctk.CTkFont(size=60)
-        ).pack(pady=(30, 10))
+            font=ctk.CTkFont(size=70)
+        ).pack(pady=(40, 15))
         
         # Title
         ctk.CTkLabel(
             main_frame, text=title,
-            font=ctk.CTkFont(size=28, weight="bold"),
+            font=ctk.CTkFont(size=32, weight="bold"),
             text_color="white"
-        ).pack(pady=5)
+        ).pack(pady=10)
         
         # Message
         ctk.CTkLabel(
             main_frame, text=message,
-            font=ctk.CTkFont(size=16),
+            font=ctk.CTkFont(size=18),
             text_color="#cccccc"
-        ).pack(pady=5)
+        ).pack(pady=10)
         
         # Confidence bar
         conf_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        conf_frame.pack(pady=15, fill="x", padx=40)
+        conf_frame.pack(pady=15, fill="x", padx=50)
         
         ctk.CTkLabel(
             conf_frame, text=f"Confidence: {confidence:.1f}%",
-            font=ctk.CTkFont(size=14)
+            font=ctk.CTkFont(size=16)
         ).pack()
         
-        conf_bar = ctk.CTkProgressBar(conf_frame, width=200)
-        conf_bar.pack(pady=5)
+        conf_bar = ctk.CTkProgressBar(conf_frame, width=250, height=15)
+        conf_bar.pack(pady=8)
         conf_bar.set(confidence / 100)
         
         # Timestamp
@@ -115,24 +119,31 @@ class VerificationPopup(ctk.CTkToplevel):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ctk.CTkLabel(
             main_frame, text=f"🕐 {timestamp}",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=14),
             text_color="#888888"
-        ).pack(pady=5)
+        ).pack(pady=8)
         
-        # OK button
+        # OK button - BIGGER
         ctk.CTkButton(
             main_frame, text="OK",
-            width=120, height=35,
+            width=150, height=45,
+            font=ctk.CTkFont(size=16, weight="bold"),
             fg_color=accent_color,
             hover_color=main_color,
-            command=self.destroy
-        ).pack(pady=15)
+            command=self._close
+        ).pack(pady=20)
         
         # Auto close after 5 seconds
-        self.after(5000, self.destroy)
+        self.after(5000, self._close)
         
         # Focus
         self.focus_force()
+    
+    def _close(self):
+        """Close popup and call callback"""
+        if self.on_close_callback:
+            self.on_close_callback()
+        self.destroy()
 
 
 class SuccessToast(ctk.CTkToplevel):
@@ -947,88 +958,117 @@ class FaceVerificationApp(ctk.CTk):
         threading.Thread(target=self._verify_camera_loop, daemon=True).start()
     
     def _verify_camera_loop(self):
-        """Camera loop for verification - OPTIMIZED for performance"""
+        """Camera loop for verification - FIXED for performance"""
         try:
             self.camera.start()
             
             frame_count = 0
-            process_every = 5  # Only process every 5th frame
+            process_every = 10  # Process every 10th frame (reduce CPU load)
             last_result = None
             last_box = None
             last_color = (128, 128, 128)
+            last_update_time = 0
             
             while self.camera_running:
                 ret, frame = self.camera.read_frame()
                 if not ret:
+                    time.sleep(0.01)
                     continue
                 
                 frame_count += 1
+                current_time = time.time()
                 
-                # Only process every Nth frame for AI (expensive)
-                if frame_count % process_every == 0:
-                    faces = self.detector.detect_faces(frame)
+                # Only process every Nth frame AND at least 300ms apart
+                should_process = (frame_count % process_every == 0) and (current_time - last_update_time > 0.3)
+                
+                if should_process:
+                    last_update_time = current_time
                     
-                    if faces:
-                        face = self.detector.get_largest_face(faces)
-                        x, y, w, h = face['box']
-                        last_box = (x, y, w, h)
+                    try:
+                        faces = self.detector.detect_faces(frame)
                         
-                        embedding = self.embedding_generator.generate_embedding(face['face_img'])
-                        
-                        if embedding is not None:
-                            result = self.verifier.verify_with_database(embedding, self.db)
-                            result = self.verifier.verify_with_voting(result)
-                            last_result = result
+                        if faces:
+                            face = self.detector.get_largest_face(faces)
+                            x, y, w, h = face['box']
+                            last_box = (x, y, w, h)
                             
-                            if result['verified']:
-                                last_color = (0, 255, 0)
-                                result_text = f"✅ VERIFIED: {result['user_name']} ({result['confidence']:.1f}%)"
-                                text_color = "green"
+                            embedding = self.embedding_generator.generate_embedding(face['face_img'])
+                            
+                            if embedding is not None:
+                                result = self.verifier.verify_with_database(embedding, self.db)
+                                result = self.verifier.verify_with_voting(result)
+                                last_result = result
                                 
-                                # Show popup once per verification session
-                                if not hasattr(self, '_popup_shown') or not self._popup_shown:
-                                    self._popup_shown = True
-                                    self.after(0, lambda r=result: self._show_verification_popup(r))
-                            else:
-                                last_color = (0, 0, 255)
-                                result_text = f"❌ NOT VERIFIED ({result['confidence']:.1f}%)"
-                                text_color = "red"
-                            
-                            self.verify_result.configure(text=result_text, text_color=text_color)
-                    else:
-                        last_box = None
-                        last_result = None
-                        self._popup_shown = False  # Reset popup flag when no face
-                        self.verify_result.configure(
-                            text="🔍 No face detected",
-                            text_color="orange"
-                        )
-                        self.verifier.reset_voting()
+                                if result['verified']:
+                                    last_color = (0, 255, 0)
+                                    result_text = f"✅ VERIFIED: {result['user_name']} ({result['confidence']:.1f}%)"
+                                    text_color = "green"
+                                    
+                                    # Show popup once per session
+                                    if not getattr(self, '_popup_shown', False):
+                                        self._popup_shown = True
+                                        self.after(0, lambda r=result: self._show_verification_popup(r))
+                                else:
+                                    last_color = (0, 0, 255)
+                                    result_text = f"❌ NOT VERIFIED ({result['confidence']:.1f}%)"
+                                    text_color = "red"
+                                
+                                # Thread-safe UI update
+                                self.after(0, lambda t=result_text, c=text_color: 
+                                    self.verify_result.configure(text=t, text_color=c))
+                        else:
+                            last_box = None
+                            last_result = None
+                            self._popup_shown = False
+                            self.after(0, lambda: self.verify_result.configure(
+                                text="🔍 No face detected", text_color="orange"))
+                            self.verifier.reset_voting()
+                    except Exception as e:
+                        print(f"Processing error: {e}")
                 
-                # Draw cached box on every frame (smooth display)
+                # Draw cached box on every frame
+                display_frame = frame.copy()
                 if last_box:
                     x, y, w, h = last_box
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), last_color, 3)
+                    cv2.rectangle(display_frame, (x, y), (x + w, y + h), last_color, 3)
                 
-                # Convert for display - resize smaller for speed
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame_rgb = cv2.resize(frame_rgb, (480, 360))
-                img = Image.fromarray(frame_rgb)
-                photo = ctk.CTkImage(img, size=(480, 360))
+                # Convert for display
+                try:
+                    frame_rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+                    frame_rgb = cv2.resize(frame_rgb, (480, 360))
+                    img = Image.fromarray(frame_rgb)
+                    photo = ctk.CTkImage(img, size=(480, 360))
+                    
+                    # Thread-safe image update
+                    self.after(0, lambda p=photo: self._update_verify_image(p))
+                except Exception:
+                    pass
                 
-                self.verify_camera_label.configure(image=photo, text="")
-                self.verify_camera_label.image = photo
-                
-                time.sleep(0.01)  # Reduced sleep for smoother display
+                time.sleep(0.02)  # ~50 FPS max display rate
             
             self.camera.stop()
         except Exception as e:
             print(f"Camera error: {e}")
-            self.camera.stop()
+            try:
+                self.camera.stop()
+            except:
+                pass
         finally:
-            self._set_processing(False)
-            self.btn_live_verify.configure(state="normal")
-            self.btn_img_verify.configure(state="normal")
+            self.after(0, self._verify_cleanup)
+    
+    def _update_verify_image(self, photo):
+        """Thread-safe image update"""
+        try:
+            self.verify_camera_label.configure(image=photo, text="")
+            self.verify_camera_label.image = photo
+        except:
+            pass
+    
+    def _verify_cleanup(self):
+        """Cleanup after verification"""
+        self._set_processing(False)
+        self.btn_live_verify.configure(state="normal")
+        self.btn_img_verify.configure(state="normal")
     
     def _verify_from_image(self):
         """Verify from image file"""
@@ -1110,11 +1150,17 @@ class FaceVerificationApp(ctk.CTk):
     def _show_verification_popup(self, result):
         """Show professional verification popup"""
         try:
+            # If verified, stop camera when popup closes
+            callback = None
+            if result['verified']:
+                callback = self._stop_verification
+            
             popup = VerificationPopup(
                 self,
                 verified=result['verified'],
                 user_name=result.get('user_name', 'Unknown'),
-                confidence=result.get('confidence', 0)
+                confidence=result.get('confidence', 0),
+                on_close=callback
             )
         except Exception as e:
             print(f"Popup error: {e}")

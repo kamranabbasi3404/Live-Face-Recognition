@@ -10,17 +10,18 @@ A professional **real-time face verification system** built with Python, featuri
 
 - **🎯 Real-time Face Verification** - Verify identity using live webcam feed
 - **📷 Image Upload Support** - Upload photos from phone or files for enrollment/verification
-- **🌙 Modern Dark GUI** - Professional CustomTkinter interface with popups
+- **🌙 Modern Dark GUI** - Professional CustomTkinter interface with animated popups
 - **👤 User Management** - Enroll, search, and delete users easily
 - **🔒 Secure Database** - SQLite storage for face embeddings
-- **⚡ Optimized Performance** - Frame skipping for smooth camera operation
+- **⚡ Optimized Performance** - Facenet model for fast verification (~100ms)
 - **✅ Professional Popups** - ACCESS GRANTED/DENIED notifications with confidence scores
+- **🔴 Auto-Stop Camera** - Camera automatically stops when face is verified
 
 ## 🖼️ Screenshots
 
-| Home Screen | Verification | Enrollment |
-|-------------|--------------|------------|
-| Modern welcome interface | Real-time face matching | Capture or upload photos |
+| Home Screen | Verification Popup | Enrollment |
+|-------------|-------------------|------------|
+| Modern dark interface | ACCESS GRANTED popup | Capture or upload photos |
 
 ## 🚀 Quick Start
 
@@ -34,7 +35,7 @@ A professional **real-time face verification system** built with Python, featuri
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/Live-Face-Recognition.git
+git clone https://github.com/kamranabbasi3404/Live-Face-Recognition.git
 cd Live-Face-Recognition
 
 # Install dependencies
@@ -45,7 +46,7 @@ python gui_app.py
 ```
 
 ### First Run
-On first run, the system will download the VGG-Face model (~580MB). This is a one-time download.
+On first run, the system will download the Facenet model (~90MB). This is a one-time download.
 
 ## 📁 Project Structure
 
@@ -57,15 +58,14 @@ Live-Face-Recognition/
 ├── requirements.txt    # Python dependencies
 ├── modules/
 │   ├── camera.py       # Webcam handling
-│   ├── face_detector.py # Face detection (RetinaFace)
-│   ├── embeddings.py   # Face embedding generation (DeepFace)
+│   ├── face_detector.py # Face detection (OpenCV)
+│   ├── embeddings.py   # Face embedding generation (DeepFace + Facenet)
 │   ├── verifier.py     # Face verification logic
 │   ├── liveness.py     # Liveness detection (blink)
 │   └── display.py      # OpenCV display utilities
 ├── database/
 │   └── db_manager.py   # SQLite database management
-└── data/
-    └── enrolled_images/ # Stored user face images
+└── enrolled_images/    # Stored user face images
 ```
 
 ## 🎮 Usage
@@ -82,7 +82,7 @@ python main.py
 
 ### Enrollment
 1. Click **"📷 Enroll User"**
-2. Enter user name
+2. Enter user name (User ID is auto-generated)
 3. Choose **Webcam** or **Upload Images**
 4. Capture 3-5 photos from different angles
 5. Click **"💾 Save User"**
@@ -90,36 +90,45 @@ python main.py
 ### Verification
 1. Click **"✓ Verify Face"**
 2. Choose **Live Verification** or **Verify from Image**
-3. Professional popup shows ACCESS GRANTED/DENIED
+3. Professional popup shows **ACCESS GRANTED** or **ACCESS DENIED**
+4. Camera automatically stops when verified
 
 ## ⚙️ Configuration
 
 Edit `config.py` to customize:
 
 ```python
-EMBEDDING_MODEL = "VGG-Face"    # Face recognition model
-VERIFICATION_THRESHOLD = 0.6    # Match threshold (0-1)
-LIVENESS_ENABLED = False        # Enable blink detection
+EMBEDDING_MODEL = "Facenet"      # Fast face recognition model
+VERIFICATION_THRESHOLD = 0.40   # Match threshold (lower = stricter)
+LIVENESS_ENABLED = True         # Enable blink detection
+FACE_DETECTOR_BACKEND = "opencv" # Fast face detection
 ```
 
 ## 🛠️ Tech Stack
 
 - **GUI**: CustomTkinter (dark theme)
-- **Face Detection**: RetinaFace
-- **Face Recognition**: DeepFace + VGG-Face
+- **Face Detection**: OpenCV
+- **Face Recognition**: DeepFace + Facenet
 - **Database**: SQLite3
 - **Computer Vision**: OpenCV
 - **Deep Learning**: TensorFlow/Keras
 
 ## 📊 Performance
 
-| Operation | Time (CPU) |
-|-----------|------------|
-| Face Detection | ~50ms |
-| Embedding Generation | ~200-500ms |
+| Operation | Time |
+|-----------|------|
+| Face Detection | ~30ms |
+| Embedding Generation (Facenet) | ~100ms |
 | Verification | ~5ms |
 
-*With frame skipping enabled, verification runs at ~6 FPS*
+*Live verification runs at ~3-5 FPS for smooth operation*
+
+## 🔄 Recent Updates
+
+- ⚡ Switched to Facenet model for 3-5x faster performance
+- 🪟 Added professional ACCESS GRANTED/DENIED popups
+- 📷 Camera auto-stops when face is verified
+- 🎨 Improved popup visibility and sizing
 
 ## 🤝 Contributing
 
@@ -137,7 +146,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [DeepFace](https://github.com/serengil/deepface) - Face recognition library
 - [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) - Modern GUI toolkit
-- [RetinaFace](https://github.com/serengil/retinaface) - Face detection
+- [Facenet](https://github.com/davidsandberg/facenet) - Fast face embeddings
 
 ## ⚠️ Disclaimer
 
@@ -145,4 +154,4 @@ This project is for educational and research purposes. Ensure compliance with lo
 
 ---
 
-Made with ❤️ by Kamran Dev
+Made with ❤️ by Kamran Abbasi
