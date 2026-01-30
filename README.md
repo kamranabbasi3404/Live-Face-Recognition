@@ -145,4 +145,4 @@ This project is for educational and research purposes. Ensure compliance with lo
 
 ---
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by Kamran Dev
