@@ -132,6 +132,9 @@ class Verifier:
             'user_name': None
         }
         
+        print(f"\n=== VERIFICATION DEBUG ===")
+        print(f"Checking against {len(users)} users, threshold: {self.threshold}")
+        
         for user in users:
             user_id = user['user_id']
             embeddings = db_manager.get_embeddings(user_id)
@@ -141,6 +144,8 @@ class Verifier:
             
             result = self.verify(query_embedding, embeddings)
             
+            print(f"  User: {user['name']} | Distance: {result['distance']:.4f} | Verified: {result['verified']}")
+            
             if result['distance'] < best_match['distance']:
                 best_match = {
                     'verified': result['verified'],
@@ -149,6 +154,9 @@ class Verifier:
                     'user_id': user_id,
                     'user_name': user['name']
                 }
+        
+        print(f"  BEST MATCH: {best_match['user_name']} | Distance: {best_match['distance']:.4f}")
+        print(f"=========================\n")
         
         return best_match
     

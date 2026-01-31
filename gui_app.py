@@ -441,18 +441,11 @@ class FaceVerificationApp(ctk.CTk):
         btn_frame.pack(pady=20)
         
         self.btn_webcam = ctk.CTkButton(
-            btn_frame, text="📷 Use Webcam",
+            btn_frame, text="📷 Start Camera",
             command=self._start_enroll_camera,
-            width=120
+            width=200, height=40
         )
-        self.btn_webcam.pack(side="left", padx=5)
-        
-        self.btn_upload = ctk.CTkButton(
-            btn_frame, text="📁 Upload",
-            command=self._enroll_from_files,
-            width=120
-        )
-        self.btn_upload.pack(side="left", padx=5)
+        self.btn_webcam.pack(padx=5)
         
         # Progress
         self.enroll_progress = ctk.CTkLabel(
@@ -556,12 +549,7 @@ class FaceVerificationApp(ctk.CTk):
         )
         self.btn_live_verify.pack(side="left", padx=10)
         
-        self.btn_img_verify = ctk.CTkButton(
-            btn_frame, text="📁 Verify from Image",
-            command=self._verify_from_image,
-            width=180, height=40
-        )
-        self.btn_img_verify.pack(side="left", padx=10)
+        # Image verification removed - Live only mode
         
         self.btn_stop_verify = ctk.CTkButton(
             btn_frame, text="⏹ Stop",
@@ -730,7 +718,6 @@ class FaceVerificationApp(ctk.CTk):
         self.btn_capture.configure(state="normal")
         self.btn_stop_cam.configure(state="normal")
         self.btn_webcam.configure(state="disabled")
-        self.btn_upload.configure(state="disabled")
         
         threading.Thread(target=self._enroll_camera_loop, daemon=True).start()
     
@@ -779,7 +766,7 @@ class FaceVerificationApp(ctk.CTk):
             self.btn_upload.configure(state="normal")
     
     def _capture_frame(self):
-        """Capture frame for enrollment"""
+        """Capture frame for enrollment - checks for duplicate faces first"""
         if self.current_frame is None:
             messagebox.showwarning("Error", "No camera frame available!")
             return
@@ -791,6 +778,37 @@ class FaceVerificationApp(ctk.CTk):
             return
         
         face = self.detector.get_largest_face(faces)
+        
+        # CHECK FOR DUPLICATE FACE (only on first capture)
+        if len(self.captured_faces) == 0:
+            self.enroll_status.configure(text="🔍 Checking if face already exists...")
+            self.update()
+            
+            # Generate embedding for captured face
+            embedding = self.embedding_generator.generate_embedding(face['face_img'])
+            
+            if embedding is not None:
+                # Check against all users in database with STRICT duplicate threshold
+                from config import DUPLICATE_THRESHOLD
+                result = self.verifier.verify_with_database(embedding, self.db)
+                
+                # Use stricter duplicate threshold (0.20) instead of regular (0.25)
+                is_duplicate = result['distance'] < DUPLICATE_THRESHOLD
+                
+                if is_duplicate:
+                    # Face already exists!
+                    messagebox.showerror(
+                        "❌ Duplicate Face Detected!",
+                        f"This face is already registered as:\n\n"
+                        f"Name: {result['user_name']}\n"
+                        f"User ID: {result['user_id']}\n"
+                        f"Match Distance: {result['distance']:.4f}\n\n"
+                        f"You cannot register the same face twice."
+                    )
+                    self.enroll_status.configure(text="❌ Face already registered!")
+                    return
+                else:
+                    self.enroll_status.configure(text="✅ New face - OK to enroll!")
         
         # Get/generate user ID
         user_id = self.entry_user_id.get().strip()
@@ -951,7 +969,6 @@ class FaceVerificationApp(ctk.CTk):
         self.camera_running = True
         self.btn_stop_verify.configure(state="normal")
         self.btn_live_verify.configure(state="disabled")
-        self.btn_img_verify.configure(state="disabled")
         self.verifier.reset_voting()
         self._set_processing(True, "Verifying...")
         

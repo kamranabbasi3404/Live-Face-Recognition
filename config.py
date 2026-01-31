@@ -17,14 +17,17 @@ FACE_DETECTOR_BACKEND = "opencv"  # Options: opencv, mtcnn, retinaface, ssd
 MIN_FACE_SIZE = 50  # Minimum face size in pixels (lowered for low-res cameras)
 FACE_DETECTION_CONFIDENCE = 0.4
 
-# Embedding settings - Using Facenet for FASTER performance
-EMBEDDING_MODEL = "Facenet"  # Facenet is 3-5x faster than VGG-Face
+# Embedding settings - Using Facenet512 for BETTER accuracy (512-dim embeddings)
+EMBEDDING_MODEL = "Facenet512"  # More detailed than Facenet (128-dim)
 DISTANCE_METRIC = "cosine"  # Options: cosine, euclidean, euclidean_l2
 
-# Verification settings
-VERIFICATION_THRESHOLD = 0.40  # Lower = stricter (for cosine distance)
+# Verification settings - STRICT threshold
+VERIFICATION_THRESHOLD = 0.25  # Very strict - only close matches pass
 VERIFICATION_FRAMES = 5  # Number of frames for majority voting
 VERIFICATION_MAJORITY = 3  # Minimum matches needed for verification
+
+# Duplicate detection - even stricter
+DUPLICATE_THRESHOLD = 0.20  # Super strict for duplicate check
 
 # Quality check settings (DISABLED - accept any quality)
 BLUR_THRESHOLD = 1  # Accept almost any blur level
