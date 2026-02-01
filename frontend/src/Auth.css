@@ -31,9 +31,11 @@
     margin-bottom: 2rem;
 }
 
-.auth-icon {
-    font-size: 4rem;
-    display: block;
+.auth-logo {
+    width: 120px;
+    height: 120px;
+    border-radius: 15px;
+    object-fit: contain;
     margin-bottom: 1rem;
 }
 

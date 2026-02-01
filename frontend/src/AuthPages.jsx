@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from './AuthContext'
+import Logo from './assets/Logo.png'
 import './Auth.css'
 
 export function LoginPage({ onSwitchToRegister }) {
@@ -30,7 +31,7 @@ export function LoginPage({ onSwitchToRegister }) {
         <div className="auth-container">
             <div className="auth-card">
                 <div className="auth-header">
-                    <span className="auth-icon">👤</span>
+                    <img src={Logo} alt="Logo" className="auth-logo" />
                     <h1>Face Recognition</h1>
                     <p>Sign in to your account</p>
                 </div>
@@ -117,7 +118,7 @@ export function RegisterPage({ onSwitchToLogin }) {
         <div className="auth-container">
             <div className="auth-card">
                 <div className="auth-header">
-                    <span className="auth-icon">✨</span>
+                    <img src={Logo} alt="Logo" className="auth-logo" />
                     <h1>Create Account</h1>
                     <p>Get started with Face Recognition</p>
                 </div>

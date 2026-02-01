@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import Webcam from 'react-webcam'
 import { AuthProvider, useAuth } from './AuthContext'
 import { LoginPage, RegisterPage } from './AuthPages'
+import Logo from './assets/Logo.png'
 import './App.css'
 import './Auth.css'
 
@@ -160,7 +161,7 @@ function AppContent() {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="logo">
-          <span className="logo-icon">👤</span>
+          <img src={Logo} alt="Logo" className="logo-img" />
           <h1>Face Recognition</h1>
         </div>
 
@@ -273,7 +274,7 @@ function HomePage() {
     <div className="page home-page">
       {/* Hero Section */}
       <div className="hero-section">
-        <div className="hero-icon">👤</div>
+        <img src={Logo} alt="Logo" className="hero-logo" />
         <h1 className="hero-title">Live Face Recognition</h1>
         <p className="hero-subtitle">Advanced Real-Time Face Verification System</p>
         <p className="hero-description">
