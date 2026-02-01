@@ -111,18 +111,19 @@ class Verifier:
             'confidence': confidence
         }
     
-    def verify_with_database(self, query_embedding, db_manager):
+    def verify_with_database(self, query_embedding, db_manager, owner_id=None):
         """
-        Verify against all users in database
+        Verify against all users in database (filtered by owner)
         
         Args:
             query_embedding: Embedding to verify
             db_manager: Database manager instance
+            owner_id: Optional account ID to filter by (for multi-user isolation)
             
         Returns:
             dict: Verification result including matched user_id if verified
         """
-        users = db_manager.get_all_users()
+        users = db_manager.get_all_users(owner_id=owner_id)
         
         best_match = {
             'verified': False,

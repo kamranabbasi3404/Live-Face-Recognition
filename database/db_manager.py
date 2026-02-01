@@ -1,5 +1,6 @@
 """
 Database Manager Module - Handles SQLite database operations for face embeddings
+With Multi-User Authentication Support
 """
 import sqlite3
 import numpy as np
@@ -21,6 +22,7 @@ class DatabaseManager:
         self.db_path = db_path
         self._ensure_db_exists()
         self._create_tables()
+        self._migrate_tables()
     
     def _ensure_db_exists(self):
         """Ensure database directory exists"""
@@ -37,12 +39,25 @@ class DatabaseManager:
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        # Users table
+        # Accounts table (for user authentication)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Users table (enrolled faces)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                owner_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (owner_id) REFERENCES accounts(id) ON DELETE CASCADE
             )
         ''')
         
@@ -61,13 +76,123 @@ class DatabaseManager:
         conn.commit()
         conn.close()
     
-    def add_user(self, user_id, name):
+    def _migrate_tables(self):
+        """Add owner_id column if it doesn't exist (for existing databases)"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # Check if owner_id column exists
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'owner_id' not in columns:
+            cursor.execute('ALTER TABLE users ADD COLUMN owner_id INTEGER REFERENCES accounts(id)')
+            conn.commit()
+        
+        conn.close()
+    
+    # ==================== ACCOUNT METHODS ====================
+    
+    def create_account(self, email, password_hash, name):
         """
-        Add a new user
+        Create a new account
+        
+        Args:
+            email: User email (unique)
+            password_hash: Hashed password
+            name: User's display name
+            
+        Returns:
+            int: Account ID or None if failed
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                'INSERT INTO accounts (email, password_hash, name) VALUES (?, ?, ?)',
+                (email, password_hash, name)
+            )
+            
+            account_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return account_id
+            
+        except sqlite3.IntegrityError:
+            return None
+    
+    def get_account_by_email(self, email):
+        """
+        Get account by email
+        
+        Args:
+            email: Account email
+            
+        Returns:
+            dict: Account data or None
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            'SELECT id, email, password_hash, name, created_at FROM accounts WHERE email = ?',
+            (email,)
+        )
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'id': row[0],
+                'email': row[1],
+                'password_hash': row[2],
+                'name': row[3],
+                'created_at': row[4]
+            }
+        return None
+    
+    def get_account_by_id(self, account_id):
+        """
+        Get account by ID
+        
+        Args:
+            account_id: Account ID
+            
+        Returns:
+            dict: Account data or None
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            'SELECT id, email, name, created_at FROM accounts WHERE id = ?',
+            (account_id,)
+        )
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'id': row[0],
+                'email': row[1],
+                'name': row[2],
+                'created_at': row[3]
+            }
+        return None
+    
+    # ==================== USER METHODS (with owner filtering) ====================
+    
+    def add_user(self, user_id, name, owner_id=None):
+        """
+        Add a new user (enrolled face)
         
         Args:
             user_id: Unique user identifier
             name: User's name
+            owner_id: Account ID of the owner
             
         Returns:
             bool: True if successful, False if user already exists
@@ -77,8 +202,8 @@ class DatabaseManager:
             cursor = conn.cursor()
             
             cursor.execute(
-                'INSERT INTO users (user_id, name) VALUES (?, ?)',
-                (user_id, name)
+                'INSERT INTO users (user_id, name, owner_id) VALUES (?, ?, ?)',
+                (user_id, name, owner_id)
             )
             
             conn.commit()
@@ -88,12 +213,13 @@ class DatabaseManager:
         except sqlite3.IntegrityError:
             return False
     
-    def get_user(self, user_id):
+    def get_user(self, user_id, owner_id=None):
         """
-        Get user by ID
+        Get user by ID (optionally filtered by owner)
         
         Args:
             user_id: User identifier
+            owner_id: Optional owner account ID
             
         Returns:
             dict: User data or None
@@ -101,10 +227,16 @@ class DatabaseManager:
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute(
-            'SELECT user_id, name, created_at FROM users WHERE user_id = ?',
-            (user_id,)
-        )
+        if owner_id is not None:
+            cursor.execute(
+                'SELECT user_id, name, owner_id, created_at FROM users WHERE user_id = ? AND owner_id = ?',
+                (user_id, owner_id)
+            )
+        else:
+            cursor.execute(
+                'SELECT user_id, name, owner_id, created_at FROM users WHERE user_id = ?',
+                (user_id,)
+            )
         
         row = cursor.fetchone()
         conn.close()
@@ -113,36 +245,47 @@ class DatabaseManager:
             return {
                 'user_id': row[0],
                 'name': row[1],
-                'created_at': row[2]
+                'owner_id': row[2],
+                'created_at': row[3]
             }
         return None
     
-    def get_all_users(self):
+    def get_all_users(self, owner_id=None):
         """
-        Get all users
+        Get all users (filtered by owner if specified)
         
+        Args:
+            owner_id: Account ID to filter by (None = all users)
+            
         Returns:
             list: List of user dictionaries
         """
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT user_id, name, created_at FROM users ORDER BY created_at DESC')
+        if owner_id is not None:
+            cursor.execute(
+                'SELECT user_id, name, owner_id, created_at FROM users WHERE owner_id = ? ORDER BY created_at DESC',
+                (owner_id,)
+            )
+        else:
+            cursor.execute('SELECT user_id, name, owner_id, created_at FROM users ORDER BY created_at DESC')
         
         rows = cursor.fetchall()
         conn.close()
         
         return [
-            {'user_id': row[0], 'name': row[1], 'created_at': row[2]}
+            {'user_id': row[0], 'name': row[1], 'owner_id': row[2], 'created_at': row[3]}
             for row in rows
         ]
     
-    def delete_user(self, user_id):
+    def delete_user(self, user_id, owner_id=None):
         """
-        Delete a user and their embeddings
+        Delete a user and their embeddings (optionally verify owner)
         
         Args:
             user_id: User identifier
+            owner_id: Optional owner ID (if set, only delete if owned by this account)
             
         Returns:
             bool: True if user was deleted
@@ -150,11 +293,22 @@ class DatabaseManager:
         conn = self._get_connection()
         cursor = conn.cursor()
         
+        # Verify ownership if owner_id provided
+        if owner_id is not None:
+            cursor.execute('SELECT owner_id FROM users WHERE user_id = ?', (user_id,))
+            row = cursor.fetchone()
+            if not row or row[0] != owner_id:
+                conn.close()
+                return False
+        
         # Delete embeddings first
         cursor.execute('DELETE FROM embeddings WHERE user_id = ?', (user_id,))
         
-        # Delete user
-        cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
+        # Delete user (with owner check if specified)
+        if owner_id is not None:
+            cursor.execute('DELETE FROM users WHERE user_id = ? AND owner_id = ?', (user_id, owner_id))
+        else:
+            cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
         
         deleted = cursor.rowcount > 0
         
@@ -227,6 +381,47 @@ class DatabaseManager:
         
         return embeddings
     
+    def get_all_embeddings_with_users(self, owner_id=None):
+        """
+        Get all embeddings with user info (filtered by owner)
+        
+        Args:
+            owner_id: Account ID to filter by
+            
+        Returns:
+            list: List of (user_id, name, embedding) tuples
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        if owner_id is not None:
+            cursor.execute('''
+                SELECT u.user_id, u.name, e.embedding 
+                FROM users u 
+                JOIN embeddings e ON u.user_id = e.user_id 
+                WHERE u.owner_id = ?
+            ''', (owner_id,))
+        else:
+            cursor.execute('''
+                SELECT u.user_id, u.name, e.embedding 
+                FROM users u 
+                JOIN embeddings e ON u.user_id = e.user_id
+            ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for row in rows:
+            embedding = np.frombuffer(row[2], dtype=np.float64)
+            result.append({
+                'user_id': row[0],
+                'name': row[1],
+                'embedding': embedding
+            })
+        
+        return result
+    
     def get_embedding_count(self, user_id):
         """
         Get number of embeddings for a user
@@ -262,21 +457,35 @@ class DatabaseManager:
         """
         return self.get_user(user_id) is not None
     
-    def get_statistics(self):
+    def get_statistics(self, owner_id=None):
         """
-        Get database statistics
+        Get database statistics (filtered by owner if specified)
         
+        Args:
+            owner_id: Account ID to filter by
+            
         Returns:
             dict: Statistics about users and embeddings
         """
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT COUNT(*) FROM users')
-        user_count = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM embeddings')
-        embedding_count = cursor.fetchone()[0]
+        if owner_id is not None:
+            cursor.execute('SELECT COUNT(*) FROM users WHERE owner_id = ?', (owner_id,))
+            user_count = cursor.fetchone()[0]
+            
+            cursor.execute('''
+                SELECT COUNT(*) FROM embeddings e 
+                JOIN users u ON e.user_id = u.user_id 
+                WHERE u.owner_id = ?
+            ''', (owner_id,))
+            embedding_count = cursor.fetchone()[0]
+        else:
+            cursor.execute('SELECT COUNT(*) FROM users')
+            user_count = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM embeddings')
+            embedding_count = cursor.fetchone()[0]
         
         conn.close()
         
@@ -298,12 +507,20 @@ def test_database():
     
     print("Testing database operations...")
     
-    # Test add user
-    result = db.add_user('user1', 'John Doe')
+    # Test create account
+    account_id = db.create_account('test@example.com', 'hashed_password', 'Test User')
+    print(f"Create account ID: {account_id}")
+    
+    # Test get account
+    account = db.get_account_by_email('test@example.com')
+    print(f"Get account: {account}")
+    
+    # Test add user with owner
+    result = db.add_user('user1', 'John Doe', owner_id=account_id)
     print(f"Add user: {'Success' if result else 'Failed'}")
     
     # Test get user
-    user = db.get_user('user1')
+    user = db.get_user('user1', owner_id=account_id)
     print(f"Get user: {user}")
     
     # Test add embedding
@@ -311,17 +528,20 @@ def test_database():
     emb_id = db.add_embedding('user1', test_embedding)
     print(f"Add embedding ID: {emb_id}")
     
-    # Test get embeddings
-    embeddings = db.get_embeddings('user1')
-    print(f"Embeddings count: {len(embeddings)}")
-    print(f"Embedding shape: {embeddings[0].shape if embeddings else 'N/A'}")
+    # Test get all users filtered by owner
+    users = db.get_all_users(owner_id=account_id)
+    print(f"Users for account: {len(users)}")
+    
+    # Test get all embeddings with users
+    emb_data = db.get_all_embeddings_with_users(owner_id=account_id)
+    print(f"Embeddings with users: {len(emb_data)}")
     
     # Test statistics
-    stats = db.get_statistics()
+    stats = db.get_statistics(owner_id=account_id)
     print(f"Statistics: {stats}")
     
     # Test delete user
-    deleted = db.delete_user('user1')
+    deleted = db.delete_user('user1', owner_id=account_id)
     print(f"Delete user: {'Success' if deleted else 'Failed'}")
     
     # Cleanup

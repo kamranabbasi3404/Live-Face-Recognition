@@ -1,8 +1,0 @@
-# Streamlit Web App Requirements
-streamlit>=1.30.0
-opencv-python-headless>=4.8.0
-numpy>=1.24.0
-Pillow>=10.0.0
-deepface>=0.0.79
-tensorflow>=2.15.0
-tf-keras>=2.15.0
