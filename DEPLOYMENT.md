@@ -1,8 +1,8 @@
 # Face Recognition App - Deployment Guide
 
 ## Overview
-- **Frontend**: Netlify (free tier)
-- **Backend**: Render.com (free tier)
+- **Frontend**: Netlify (free, no card)
+- **Backend**: Railway.app (free, no card)
 
 ---
 
@@ -10,32 +10,26 @@
 
 ```bash
 git add .
-git commit -m "Add deployment configuration"
+git commit -m "Add deployment config"
 git push origin main
 ```
 
 ---
 
-## Step 2: Deploy Backend to Render.com
+## Step 2: Deploy Backend to Railway.app
 
-1. Go to [render.com](https://render.com) → Sign up with GitHub
+1. Go to [railway.app](https://railway.app) → Sign up with GitHub
 
-2. Click **New +** → **Web Service** → Connect your repo
+2. Click **New Project** → **Deploy from GitHub repo**
 
-3. Configure:
-   | Setting | Value |
-   |---------|-------|
-   | Name | `face-recognition-api` |
-   | Branch | `main` |
-   | Build Command | `pip install -r requirements.txt` |
-   | Start Command | `gunicorn api:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120` |
+3. Select your `Live-Face-Recognition` repository
 
-4. Add Environment Variable:
-   - `JWT_SECRET` = `your-random-secret-key`
+4. Railway auto-detects Python. Click **Add Variables**:
+   - `JWT_SECRET` = `facerecognition2024secretkey`
 
-5. Click **Create Web Service** → Wait for deploy
+5. Go to **Settings** → **Generate Domain** (to get public URL)
 
-6. **Copy your URL** (e.g., `https://face-recognition-api.onrender.com`)
+6. Copy your URL (e.g., `https://live-face-recognition.up.railway.app`)
 
 ---
 
@@ -45,33 +39,18 @@ git push origin main
 
 2. Click **Add new site** → **Import an existing project**
 
-3. Select your GitHub repo
+3. Configure:
+   - **Base directory**: `frontend`
+   - **Build command**: `npm run build`
+   - **Publish directory**: `frontend/dist`
 
-4. Configure:
-   | Setting | Value |
-   |---------|-------|
-   | Base directory | `frontend` |
-   | Build command | `npm run build` |
-   | Publish directory | `frontend/dist` |
+4. Add environment variable:
+   - `VITE_API_URL` = `https://your-railway-url.up.railway.app/api`
 
-5. Click **Site configuration** → **Environment variables** → Add:
-   - `VITE_API_URL` = `https://your-render-url.onrender.com/api`
-
-6. Click **Deploy site**
+5. Deploy!
 
 ---
 
-## Step 4: Test Your Deployment
+## Done! 🎉
 
-1. Open your Netlify URL
-2. Register a new account
-3. Enroll a face
-4. Verify the face
-
----
-
-## Notes
-
-⚠️ **Free Tier Limitations:**
-- Backend takes 30-60 seconds to wake up after inactivity
-- SQLite data may be lost on redeploy (use PostgreSQL for production)
+Test your app at your Netlify URL.
