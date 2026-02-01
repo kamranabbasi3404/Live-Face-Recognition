@@ -6,7 +6,7 @@ import Logo from './assets/Logo.png'
 import './App.css'
 import './Auth.css'
 
-const API_URL = 'http://localhost:5000/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 function AppContent() {
   const { user, token, loading: authLoading, logout, isAuthenticated } = useAuth()
